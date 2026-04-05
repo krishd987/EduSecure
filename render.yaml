@@ -2,7 +2,7 @@ services:
   - type: web
     name: edusecure-backend
     env: python
-    buildCommand: "./build.sh"
+    buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn --chdir backend --workers 4 --threads 2 --timeout 120 app:app"
     envVars:
       - key: PYTHON_VERSION
