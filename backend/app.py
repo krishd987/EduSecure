@@ -12,6 +12,7 @@ Deployment:
   - Binds to 0.0.0.0:PORT (default 8000)
   - Uses torch.no_grad() for inference
   - Headless: no cv2.imshow, only cv2.imencode for web streaming
+  - Gracefully degrades when heavy ML models can't load (e.g., low-RAM servers)
 """
 
 from flask import Flask, request, jsonify
@@ -22,21 +23,63 @@ import base64
 import os
 import time
 import threading
-import torch
 
-from eye_movement_opencv import process_eye_movement
-from head_pose_opencv import process_head_pose
-from mobile_detection import process_mobile_detection
-from gemini_analysis import analyze_frame_with_gemini
+# ── Check if we're in a low-memory environment ───────────────────
+LOW_MEMORY_MODE = os.environ.get('LOW_MEMORY_MODE', '').lower() in ('1', 'true', 'yes')
 
-# Optional: YOLO-Pose for body-level gesture analysis
+# ── Try to import torch (optional for low-memory deployments) ────
 try:
-    from pose_detection import process_pose_detection
-    POSE_AVAILABLE = True
-    print("[Pose] YOLO-Pose detection loaded")
+    import torch
+    TORCH_AVAILABLE = True
 except ImportError:
-    POSE_AVAILABLE = False
-    print("[Pose] pose_detection not available, skipping body pose analysis")
+    TORCH_AVAILABLE = False
+    print("[Init] PyTorch not available — running without local ML models")
+
+# ── Try to import detection modules (graceful degradation) ───────
+EYE_AVAILABLE = False
+HEAD_AVAILABLE = False
+MOBILE_AVAILABLE = False
+POSE_AVAILABLE = False
+
+if not LOW_MEMORY_MODE:
+    try:
+        from eye_movement_opencv import process_eye_movement
+        EYE_AVAILABLE = True
+        print("[Init] Eye movement detection loaded")
+    except Exception as e:
+        print(f"[Init] Eye movement not available: {e}")
+
+    try:
+        from head_pose_opencv import process_head_pose
+        HEAD_AVAILABLE = True
+        print("[Init] Head pose detection loaded")
+    except Exception as e:
+        print(f"[Init] Head pose not available: {e}")
+
+    try:
+        from mobile_detection import process_mobile_detection
+        MOBILE_AVAILABLE = True
+        print("[Init] Mobile detection loaded")
+    except Exception as e:
+        print(f"[Init] Mobile detection not available: {e}")
+
+    try:
+        from pose_detection import process_pose_detection
+        POSE_AVAILABLE = True
+        print("[Init] YOLO-Pose detection loaded")
+    except Exception as e:
+        print(f"[Init] Pose detection not available: {e}")
+else:
+    print("[Init] LOW_MEMORY_MODE enabled — skipping all local ML models")
+
+# ── Gemini is always available (cloud API, no local RAM needed) ──
+try:
+    from gemini_analysis import analyze_frame_with_gemini
+    GEMINI_AVAILABLE = True
+    print("[Init] Gemini analysis loaded")
+except Exception as e:
+    GEMINI_AVAILABLE = False
+    print(f"[Init] Gemini analysis not available: {e}")
 
 # Set static_folder to the dist folder of the React/Vite app
 app = Flask(__name__, static_folder='../frontend/dist', static_url_path='/')
@@ -164,6 +207,45 @@ def detect_base64():
         
         current_time = time.time()
         
+        # ── If no local ML models, use Gemini-only mode ──────────
+        if not (EYE_AVAILABLE or HEAD_AVAILABLE or MOBILE_AVAILABLE):
+            # Gemini-only mode: send frame directly to Gemini for analysis
+            detection_context = {
+                'head_direction': 'Unknown',
+                'gaze_direction': 'Unknown',
+                'mobile_detected': False,
+                'behavior_state': 'Unknown',
+                'pose_alerts': [],
+            }
+            
+            gemini_result = {'risk': 'N/A', 'summary': 'Local ML models not loaded', 
+                           'gestures': 'N/A', 'integrity_score': None, 
+                           'status_label': 'N/A', 'available': False}
+            if GEMINI_AVAILABLE:
+                gemini_result = analyze_frame_with_gemini(frame, detection_context)
+            
+            return jsonify({
+                'status': 'detecting',
+                'head_direction': 'N/A (cloud mode)',
+                'gaze_direction': 'N/A (cloud mode)',
+                'mobile_detected': False,
+                'mobile_boxes': [],
+                'calibrated': True,
+                'behavior_state': gemini_result.get('status_label', 'Normal'),
+                'pose_alerts': [],
+                'person_count': 0,
+                'mode': 'gemini-only',
+                'gemini': {
+                    'risk': gemini_result.get('risk', 'N/A'),
+                    'summary': gemini_result.get('summary', ''),
+                    'gestures': gemini_result.get('gestures', 'None detected'),
+                    'integrity_score': gemini_result.get('integrity_score'),
+                    'status_label': gemini_result.get('status_label', 'N/A'),
+                    'available': gemini_result.get('available', False),
+                }
+            })
+        
+        # ── Full detection mode (local ML models available) ──────
         if calibration_start_time is None:
             calibration_start_time = current_time
             calibration_samples = []
@@ -171,9 +253,10 @@ def detect_base64():
             
         # Still in calibration period
         if not calibration_done and current_time - calibration_start_time <= 5:
-            _, angles = process_head_pose(frame, None)
-            if angles and isinstance(angles, (tuple, list)) and len(angles) == 3:
-                calibration_samples.append(angles)
+            if HEAD_AVAILABLE:
+                _, angles = process_head_pose(frame, None)
+                if angles and isinstance(angles, (tuple, list)) and len(angles) == 3:
+                    calibration_samples.append(angles)
                 
             remaining = max(0, 5 - (current_time - calibration_start_time))
             sample_count = len(calibration_samples)
@@ -202,11 +285,29 @@ def detect_base64():
                 calibrated_angles = (0.0, 0.0, 0.0)
                 print("Calibration: no samples collected, using zero baseline")
         
-        # ── Run all detections with no_grad for memory efficiency ──
-        with torch.no_grad():
-            frame, gaze_direction = process_eye_movement(frame)
-            frame, head_direction = process_head_pose(frame, calibrated_angles)
-            frame, mobile_detected, mobile_boxes = process_mobile_detection(frame)
+        # ── Run all available detections ──────────────────────────
+        gaze_direction = "Looking Center"
+        head_direction = "Looking at Screen"
+        mobile_detected = False
+        mobile_boxes = []
+        
+        use_no_grad = TORCH_AVAILABLE
+        
+        if use_no_grad:
+            with torch.no_grad():
+                if EYE_AVAILABLE:
+                    frame, gaze_direction = process_eye_movement(frame)
+                if HEAD_AVAILABLE:
+                    frame, head_direction = process_head_pose(frame, calibrated_angles)
+                if MOBILE_AVAILABLE:
+                    frame, mobile_detected, mobile_boxes = process_mobile_detection(frame)
+        else:
+            if EYE_AVAILABLE:
+                frame, gaze_direction = process_eye_movement(frame)
+            if HEAD_AVAILABLE:
+                frame, head_direction = process_head_pose(frame, calibrated_angles)
+            if MOBILE_AVAILABLE:
+                frame, mobile_detected, mobile_boxes = process_mobile_detection(frame)
         
         # Safety: ensure head_direction is a string
         if not isinstance(head_direction, str):
@@ -218,7 +319,10 @@ def detect_base64():
         pose_boxes = []
         if POSE_AVAILABLE:
             try:
-                with torch.no_grad():
+                if use_no_grad:
+                    with torch.no_grad():
+                        _, pose_alerts, person_count, pose_boxes = process_pose_detection(frame)
+                else:
                     _, pose_alerts, person_count, pose_boxes = process_pose_detection(frame)
             except Exception as e:
                 print(f"[Pose] Error: {e}")
@@ -229,7 +333,6 @@ def detect_base64():
         )
         
         # ── Gemini: trigger if suspicious for >3s ──
-        # Build detection context for Gemini
         detection_context = {
             'head_direction': head_direction,
             'gaze_direction': gaze_direction,
@@ -238,18 +341,15 @@ def detect_base64():
             'pose_alerts': pose_alerts,
         }
         
-        # Always try to get cached Gemini result; trigger new analysis if warranted
         force_gemini = should_trigger_gemini(behavior_state)
         
-        # Call Gemini (non-blocking): always returns cached or triggers new
-        if force_gemini or behavior_state in ('Using Phone', 'Suspicious'):
-            gemini_result = analyze_frame_with_gemini(frame, detection_context)
-        else:
-            # Still return cached result if available
+        gemini_result = {'risk': 'N/A', 'summary': '', 'gestures': 'None detected',
+                        'integrity_score': None, 'status_label': 'N/A', 'available': False}
+        if GEMINI_AVAILABLE:
             gemini_result = analyze_frame_with_gemini(frame, detection_context)
         
         # Clean up CUDA cache periodically
-        if torch.cuda.is_available():
+        if TORCH_AVAILABLE and torch.cuda.is_available():
             torch.cuda.empty_cache()
         
         # Return detection results
@@ -301,8 +401,12 @@ def health_check():
         'status': 'healthy',
         'message': 'Master Proctor API is running',
         'features': {
+            'eye_tracking': EYE_AVAILABLE,
+            'head_pose': HEAD_AVAILABLE,
+            'mobile_detection': MOBILE_AVAILABLE,
             'pose_detection': POSE_AVAILABLE,
-            'gemini_api': bool(os.environ.get('GEMINI_API_KEY')),
+            'gemini_api': GEMINI_AVAILABLE,
+            'low_memory_mode': LOW_MEMORY_MODE,
         }
     })
 
@@ -321,6 +425,10 @@ def serve_static(path):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
     print(f"Starting Master Proctor API Server on port {port}...")
+    print(f"  Eye Tracking: {'Enabled' if EYE_AVAILABLE else 'Disabled'}")
+    print(f"  Head Pose: {'Enabled' if HEAD_AVAILABLE else 'Disabled'}")
+    print(f"  Mobile Detection: {'Enabled' if MOBILE_AVAILABLE else 'Disabled'}")
     print(f"  YOLO-Pose: {'Enabled' if POSE_AVAILABLE else 'Disabled'}")
-    print(f"  Gemini API: {'Enabled' if os.environ.get('GEMINI_API_KEY') else 'Disabled (set GEMINI_API_KEY)'}")
+    print(f"  Gemini API: {'Enabled' if GEMINI_AVAILABLE else 'Disabled (set GEMINI_API_KEY)'}")
+    print(f"  Low Memory Mode: {'Yes' if LOW_MEMORY_MODE else 'No'}")
     app.run(host='0.0.0.0', port=port, debug=True)

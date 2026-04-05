@@ -1,26 +1,23 @@
 # Stage 1: Build the frontend
-FROM node:20 AS frontend-builder
+FROM node:20-slim AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: Set up the Python backend
+# Stage 2: Set up the Python backend (lightweight for Render free tier)
 FROM python:3.11-slim
 WORKDIR /app
 
-# Install system dependencies required by OpenCV and MediaPipe
+# Install minimal system dependencies (OpenCV headless needs very little)
 RUN apt-get update && apt-get install -y \
-    libgl1 \
-    libgles2 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies using CPU-only version of PyTorch
-COPY requirements.txt ./
-COPY backend/requirements.txt ./backend/
-RUN pip install --no-cache-dir -r requirements.txt
+# Install lightweight Python dependencies (no PyTorch/YOLO/MediaPipe)
+COPY requirements-render.txt ./
+RUN pip install --no-cache-dir -r requirements-render.txt
 
 # Copy the backend code
 COPY backend/ ./backend/
@@ -34,6 +31,7 @@ EXPOSE 10000
 # Set environment variables
 ENV PORT=10000
 ENV PYTHONUNBUFFERED=1
+ENV LOW_MEMORY_MODE=true
 
-# Start the application
-CMD cd backend && gunicorn --bind 0.0.0.0:$PORT --workers 4 --threads 2 --timeout 120 app:app
+# Start the application (1 worker to minimize memory)
+CMD cd backend && gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 app:app

@@ -1,0 +1,9 @@
+# Lightweight requirements for Render deployment (Gemini-only mode)
+# Excludes heavy ML packages (torch, ultralytics, mediapipe) to stay under 512MB RAM
+flask==2.3.3
+flask-cors==4.0.0
+opencv-python-headless
+numpy
+gunicorn
+google-generativeai
+Pillow
