@@ -23,7 +23,7 @@ except ImportError:
     GEMINI_AVAILABLE = False
 
 # ── Configure Gemini ───────────────────────────────────────────────
-_api_key = os.environ.get('GEMINI_API_KEY', '') or 'AIzaSyAKloTVfsC-zeazP5jB0t_DIDq4a6vs5YA'
+_api_key = os.environ.get('GEMINI_API_KEY', '')
 _gemini_model = None
 
 if GEMINI_AVAILABLE and _api_key:
