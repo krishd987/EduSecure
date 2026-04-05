@@ -1,0 +1,7 @@
+{
+  "name": "EduSecure",
+  "description": "Advanced AI-powered academic integrity platform for monitoring academic honesty in real-time.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

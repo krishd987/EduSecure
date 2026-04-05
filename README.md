@@ -68,24 +68,30 @@ This will automatically start both backend and frontend servers.
 
 ### Backend Deployment
 
-1. **Create `render.yaml`:**
+1. **Automatic with `render.yaml`:**
+   - I have created a `render.yaml` file in the root directory.
+   - When you push this to your GitHub repository, Render will automatically detect it and configure the service correctly.
 
-   ```yaml
-services:
-  - type: web
-    name: edusecure-backend
-    env: python
-    buildCommand: cd backend && ../.venv/Scripts/pip.exe install -r requirements.txt
-    startCommand: cd backend && ../.venv/Scripts/python.exe app.py
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.13.0
-   ```
+2. **Manual Dashboard Setup:**
+   - **Service Type:** Web Service
+   - **Environment:** Python
+   - **Build Command:** `pip install -r backend/requirements.txt`
+   - **Start Command:** `gunicorn --chdir backend app:app`
+   - **Root Directory:** (Keep it as the repository root)
+   - **Environment Variables:**
+     - `PYTHON_VERSION`: `3.11.0`
+     - `PORT`: `10000` (optional, Render handles this)
 
-2. **Upload to Render:**
-   - Push your `final website` folder to GitHub
-   - Connect GitHub repository to Render
-   - Render will automatically deploy
+### Frontend Deployment
+
+1. **Update API URL:**
+   - In `frontend/src/App.tsx`, ensure the API URL points to your Render backend link (it usually looks like `https://edusecure-backend.onrender.com`).
+
+2. **Deploy on Vercel/Netlify:**
+   - Connect your GitHub repository.
+   - Set the **Root Directory** to `frontend`.
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
 
 ### Frontend Deployment
 

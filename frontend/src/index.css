@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Manrope", sans-serif;
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  body {
+    @apply bg-[#f8f9ff] text-[#001d36] dark:bg-black dark:text-white font-sans transition-colors duration-300;
+  }
+}
+
+@layer components {
+  .editorial-shadow {
+    box-shadow: 0 20px 40px rgba(0, 29, 54, 0.06);
+  }
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+  }
+}
