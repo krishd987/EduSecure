@@ -1,9 +1,7 @@
 services:
   - type: web
     name: edusecure-backend
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "cd backend && gunicorn --bind 0.0.0.0:$PORT --workers 4 --threads 2 --timeout 120 app:app"
+    env: docker
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
