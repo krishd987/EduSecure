@@ -32,6 +32,7 @@ head_direction = "Looking at Screen"
 while True:
     ret, frame = cap.read()
     if not ret:
+        print("Failed to grab frame from webcam. Exiting...")
         break
 
     # Process eye movement
@@ -48,7 +49,7 @@ while True:
         cv2.putText(frame, f"Head Direction: {head_direction}", (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
     # Process mobile detection
-    frame, mobile_detected = process_mobile_detection(frame)
+    frame, mobile_detected, boxes = process_mobile_detection(frame)
     cv2.putText(frame, f"Mobile Detected: {mobile_detected}", (20, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
     # Check for head misalignment

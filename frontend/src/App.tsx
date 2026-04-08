@@ -91,7 +91,7 @@ const Hero = () => (
           Integrity Powered by <span className="text-[#004ced]">AI</span>
         </h1>
         <p className="text-gray-600 dark:text-gray-400 text-base md:text-lg lg:text-xl font-normal leading-relaxed max-w-[540px]">
-          EduSecure leverages proprietary Computer Vision to monitor academic honesty in real-time, delivering a seamless proctoring experience that respects student privacy.
+          Examination malpractice is a growing concern. Traditional invigilation is limited. EduSecure uses computer vision and multi-sensor fusion to detect subtle behavioral cues in real-time, moving beyond simple object recognition.
         </p>
       </motion.div>
       <div className="flex flex-wrap gap-3 md:gap-4">
@@ -118,8 +118,8 @@ const Hero = () => (
       <div className="relative rounded-[1.5rem] md:rounded-[2rem] overflow-hidden editorial-shadow bg-gray-200 dark:bg-gray-800 aspect-[4/3] group">
         <img 
           alt="University student in a modern workspace" 
-          className="w-full h-full object-cover grayscale opacity-90 transition-transform duration-700 group-hover:scale-105" 
-          src="https://picsum.photos/seed/edusecure-student/1200/900"
+          className="w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105" 
+          src="/dq-monitoring.jpeg"
           referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent"></div>
@@ -557,13 +557,14 @@ const Workflow = () => (
       <h2 className="text-3xl md:text-4xl font-bold text-black dark:text-white font-headline">The Secure Workflow</h2>
       <p className="text-gray-600 dark:text-gray-400 text-sm md:text-base max-w-md">How we maintain the highest standards of academic integrity from start to finish.</p>
     </div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 relative">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 md:gap-10 relative">
       <div className="absolute top-8 left-0 w-full h-[2px] bg-gray-100 dark:bg-gray-800 hidden md:block z-0"></div>
       {[
-        { step: "01", title: "Environment Scan", desc: "A mandatory 360° room verification ensures a secure physical testing environment before access is granted." },
-        { step: "02", title: "Identity Lock", desc: "AI analyzes facial features and ID documentation to create a biometric hash for continuous verification." },
-        { step: "03", title: "Live Evaluation", desc: "Computer Vision tracks gaze, body position, and audio levels, flagging anomalies with surgical precision." },
-        { step: "04", title: "Integrity Report", desc: "A detailed session audit is generated for instructors, highlighting time-stamped events and risk probabilities." }
+        { step: "01", title: "Real-time Feed", desc: "Real-time camera feed capturing student actions." },
+        { step: "02", title: "Sensor Input", desc: "Continuous input from multi-modal sound and RF sensors." },
+        { step: "03", title: "Vision Checks", desc: "Computer vision checks student posture (e.g., suspicious head-turning, phone handling)." },
+        { step: "04", title: "Logic Engine", desc: "Logic engine correlates access and visual data to identify patterns." },
+        { step: "05", title: "Decision System", desc: "Decision system flags potential incidents as \"Suspicious\" or \"Normal\" with detailed results." }
       ].map((item, i) => (
         <div key={i} className="relative z-10 flex flex-col gap-4 md:gap-6">
           <div className={`w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl flex items-center justify-center font-bold text-lg md:text-xl ${i === 0 ? 'bg-black dark:bg-white text-white dark:text-black editorial-shadow' : 'bg-gray-100 dark:bg-gray-800 text-black dark:text-white'}`}>

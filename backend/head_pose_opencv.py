@@ -141,20 +141,18 @@ def process_head_pose(frame, calibrated_angles=None):
         print(f"[HEAD] yaw={rel_yaw:+.1f}  pitch={rel_pitch:+.1f}  roll={rel_roll:+.1f}")
 
         # Determine head direction — check largest deviation first
-        if abs(rel_yaw) > abs(rel_pitch) and abs(rel_yaw) > YAW_THRESHOLD:
-            # Yaw is dominant deviation
-            if rel_yaw < -YAW_THRESHOLD:
+        # Determine head direction — prioritize Yaw (Left/Right) over Pitch
+        if abs(rel_yaw) > YAW_THRESHOLD:
+            if rel_yaw > 0:
                 current_state = "Looking Left"
             else:
                 current_state = "Looking Right"
         elif abs(rel_pitch) > PITCH_THRESHOLD:
             # Pitch is dominant deviation (inverted: positive pitch = looking down)
-            if rel_pitch > PITCH_THRESHOLD:
+            if rel_pitch > 0:
                 current_state = "Looking Down"
-            elif rel_pitch < -PITCH_THRESHOLD:
-                current_state = "Looking Up"
             else:
-                current_state = "Looking at Screen"
+                current_state = "Looking Up"
         elif abs(rel_roll) > ROLL_THRESHOLD:
             current_state = "Tilted"
         else:
